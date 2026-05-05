@@ -1,0 +1,95 @@
+{
+  "os":  "Linux-4.18.0-553.77.1.el8_10.x86_64-x86_64-with-glibc2.28",
+  "python":  "CPython 3.12.2",
+  "startedAt":  "2026-05-05T04:58:51.878648Z",
+  "args":  [
+    "--model",
+    "small",
+    "--method",
+    "lora",
+    "--config",
+    "configs/config.yaml"
+  ],
+  "program":  "/scratch/ngangada/portfolio/sft-lora-rl/scripts/train_sft.py",
+  "codePath":  "scripts/train_sft.py",
+  "codePathLocal":  "scripts/train_sft.py",
+  "git":  {
+    "remote":  "https://github.com/narottaman/sft-lora-rl.git",
+    "commit":  "c38fa2fc172797de343b9266f428474da7e1d8e5"
+  },
+  "email":  "ngangada@asu.edu",
+  "root":  "/scratch/ngangada/portfolio/sft-lora-rl",
+  "host":  "sg009",
+  "executable":  "/home/ngangada/envs/sft_lora_rl/bin/python",
+  "cpu_count":  48,
+  "cpu_count_logical":  48,
+  "gpu":  "NVIDIA A100-SXM4-80GB",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "119830216704",
+      "used":  "16679292928"
+    }
+  },
+  "memory":  {
+    "total":  "540627013632"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA A100-SXM4-80GB",
+      "memoryTotal":  "85899345920",
+      "cudaCores":  6912,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-455a5c62-49ed-dd39-c517-ef8c67ff1824"
+    }
+  ],
+  "cudaVersion":  "13.0",
+  "slurm":  {
+    "array_job_id":  "52214060",
+    "array_task_count":  "3",
+    "array_task_id":  "1",
+    "array_task_max":  "2",
+    "array_task_min":  "0",
+    "array_task_step":  "1",
+    "cluster_name":  "sol",
+    "conf":  "/var/spool/slurmd/conf-cache/slurm.conf",
+    "cpus_on_node":  "8",
+    "cpus_per_task":  "8",
+    "export_env":  "NONE",
+    "get_user_env":  "1",
+    "gpus_on_node":  "1",
+    "gtids":  "0",
+    "job_account":  "grp_cbaral",
+    "job_cpus_per_node":  "8",
+    "job_end_time":  "1777971474",
+    "job_gid":  "99999937",
+    "job_gpus":  "2",
+    "job_id":  "52214072",
+    "job_name":  "sft-phase1",
+    "job_nodelist":  "sg009",
+    "job_num_nodes":  "1",
+    "job_partition":  "public",
+    "job_qos":  "public",
+    "job_start_time":  "1777957074",
+    "job_uid":  "3088253",
+    "job_user":  "ngangada",
+    "jobid":  "52214072",
+    "localid":  "0",
+    "mem_per_node":  "49152",
+    "nnodes":  "1",
+    "nodeid":  "0",
+    "nodelist":  "sg009",
+    "oom_kill_step":  "0",
+    "prio_process":  "0",
+    "procid":  "0",
+    "script_context":  "prolog_task",
+    "submit_dir":  "/scratch/ngangada/portfolio/sft-lora-rl",
+    "submit_host":  "sol-login01",
+    "task_pid":  "4036109",
+    "tasks_per_node":  "1",
+    "topology_addr":  "sg009",
+    "topology_addr_pattern":  "node",
+    "tres_per_task":  "cpu=8"
+  },
+  "writerId":  "vj1yj4lgk8xy9fk5vuobxi0g1ealtxex"
+}

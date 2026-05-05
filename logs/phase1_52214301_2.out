@@ -1,0 +1,88 @@
+==================================================
+Phase 1 — SFT Baseline
+Job ID:     52214301
+Array idx:  2
+Node:       sg036
+GPU(s):     0
+Start:      Mon May  4 22:57:45 MST 2026
+==================================================
+Mon May  4 22:57:45 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.95.05              Driver Version: 580.95.05      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:01:00.0 Off |                    0 |
+| N/A   34C    P0             84W /  500W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+--- Experiment: model=small, method=qlora ---
+[data] SFT — train: 2,000 | eval: 100
+[model] Loading Qwen/Qwen2.5-0.5B-Instruct — method=qlora
+[model] qlora_small — trainable: 8,798,208 / 323,917,696 (2.72%)
+
+============================================================
+  Starting: qlora_small
+  Model:    Qwen/Qwen2.5-0.5B-Instruct
+  Method:   qlora
+  Train:    2,000 samples x 3 epochs
+============================================================
+
+{'loss': '1.657', 'grad_norm': '4.188', 'learning_rate': '9.474e-06', 'entropy': '0.9795', 'num_tokens': '3.807e+04', 'mean_token_accuracy': '0.6893', 'epoch': '0.08'}
+{'loss': '1.437', 'grad_norm': '2.625', 'learning_rate': '2e-05', 'entropy': '1.169', 'num_tokens': '7.445e+04', 'mean_token_accuracy': '0.7126', 'epoch': '0.16'}
+{'loss': '1.06', 'grad_norm': '2.438', 'learning_rate': '1.996e-05', 'entropy': '1.049', 'num_tokens': '1.124e+05', 'mean_token_accuracy': '0.7675', 'epoch': '0.24'}
+{'loss': '0.8608', 'grad_norm': '1.898', 'learning_rate': '1.984e-05', 'entropy': '0.8582', 'num_tokens': '1.505e+05', 'mean_token_accuracy': '0.8083', 'epoch': '0.32'}
+{'loss': '0.7277', 'grad_norm': '1.695', 'learning_rate': '1.965e-05', 'entropy': '0.7662', 'num_tokens': '1.868e+05', 'mean_token_accuracy': '0.8266', 'epoch': '0.4'}
+{'loss': '0.6603', 'grad_norm': '1.32', 'learning_rate': '1.938e-05', 'entropy': '0.6486', 'num_tokens': '2.242e+05', 'mean_token_accuracy': '0.8319', 'epoch': '0.48'}
+{'loss': '0.6133', 'grad_norm': '1.078', 'learning_rate': '1.904e-05', 'entropy': '0.6304', 'num_tokens': '2.624e+05', 'mean_token_accuracy': '0.8345', 'epoch': '0.56'}
+{'loss': '0.5771', 'grad_norm': '1.203', 'learning_rate': '1.863e-05', 'entropy': '0.6055', 'num_tokens': '3.005e+05', 'mean_token_accuracy': '0.8463', 'epoch': '0.64'}
+{'loss': '0.5726', 'grad_norm': '1.219', 'learning_rate': '1.815e-05', 'entropy': '0.5944', 'num_tokens': '3.379e+05', 'mean_token_accuracy': '0.8468', 'epoch': '0.72'}
+{'loss': '0.5494', 'grad_norm': '1.219', 'learning_rate': '1.761e-05', 'entropy': '0.5714', 'num_tokens': '3.762e+05', 'mean_token_accuracy': '0.8498', 'epoch': '0.8'}
+{'eval_loss': '0.8705', 'eval_runtime': '1.351', 'eval_samples_per_second': '74.01', 'eval_steps_per_second': '9.621', 'eval_entropy': '0.6729', 'eval_num_tokens': '3.762e+05', 'eval_mean_token_accuracy': '0.7951', 'epoch': '0.8'}
+{'loss': '0.5631', 'grad_norm': '1.328', 'learning_rate': '1.701e-05', 'entropy': '0.574', 'num_tokens': '4.133e+05', 'mean_token_accuracy': '0.8458', 'epoch': '0.88'}
+{'loss': '0.5202', 'grad_norm': '1.18', 'learning_rate': '1.635e-05', 'entropy': '0.5407', 'num_tokens': '4.5e+05', 'mean_token_accuracy': '0.8563', 'epoch': '0.96'}
+{'loss': '0.4995', 'grad_norm': '1.195', 'learning_rate': '1.565e-05', 'entropy': '0.5443', 'num_tokens': '4.878e+05', 'mean_token_accuracy': '0.8591', 'epoch': '1.04'}
+{'loss': '0.5088', 'grad_norm': '1.117', 'learning_rate': '1.49e-05', 'entropy': '0.5382', 'num_tokens': '5.258e+05', 'mean_token_accuracy': '0.8602', 'epoch': '1.12'}
+{'loss': '0.5075', 'grad_norm': '1.141', 'learning_rate': '1.411e-05', 'entropy': '0.5423', 'num_tokens': '5.626e+05', 'mean_token_accuracy': '0.8595', 'epoch': '1.2'}
+{'loss': '0.5189', 'grad_norm': '1.086', 'learning_rate': '1.329e-05', 'entropy': '0.5421', 'num_tokens': '6.002e+05', 'mean_token_accuracy': '0.8576', 'epoch': '1.28'}
+{'loss': '0.5036', 'grad_norm': '1.141', 'learning_rate': '1.245e-05', 'entropy': '0.5349', 'num_tokens': '6.371e+05', 'mean_token_accuracy': '0.861', 'epoch': '1.36'}
+{'loss': '0.502', 'grad_norm': '1.195', 'learning_rate': '1.158e-05', 'entropy': '0.5338', 'num_tokens': '6.742e+05', 'mean_token_accuracy': '0.86', 'epoch': '1.44'}
+{'loss': '0.5128', 'grad_norm': '1.109', 'learning_rate': '1.071e-05', 'entropy': '0.5431', 'num_tokens': '7.125e+05', 'mean_token_accuracy': '0.8597', 'epoch': '1.52'}
+{'loss': '0.5166', 'grad_norm': '1.211', 'learning_rate': '9.824e-06', 'entropy': '0.5485', 'num_tokens': '7.5e+05', 'mean_token_accuracy': '0.8568', 'epoch': '1.6'}
+{'eval_loss': '0.8832', 'eval_runtime': '1.326', 'eval_samples_per_second': '75.41', 'eval_steps_per_second': '9.803', 'eval_entropy': '0.64', 'eval_num_tokens': '7.5e+05', 'eval_mean_token_accuracy': '0.796', 'epoch': '1.6'}
+{'loss': '0.4979', 'grad_norm': '1.305', 'learning_rate': '8.943e-06', 'entropy': '0.5306', 'num_tokens': '7.852e+05', 'mean_token_accuracy': '0.8617', 'epoch': '1.68'}
+{'loss': '0.4816', 'grad_norm': '1.211', 'learning_rate': '8.071e-06', 'entropy': '0.5201', 'num_tokens': '8.238e+05', 'mean_token_accuracy': '0.8667', 'epoch': '1.76'}
+{'loss': '0.4948', 'grad_norm': '1.242', 'learning_rate': '7.213e-06', 'entropy': '0.5226', 'num_tokens': '8.62e+05', 'mean_token_accuracy': '0.8626', 'epoch': '1.84'}
+{'loss': '0.4897', 'grad_norm': '1.242', 'learning_rate': '6.378e-06', 'entropy': '0.5276', 'num_tokens': '8.991e+05', 'mean_token_accuracy': '0.8633', 'epoch': '1.92'}
+{'loss': '0.4908', 'grad_norm': '1.297', 'learning_rate': '5.571e-06', 'entropy': '0.5173', 'num_tokens': '9.375e+05', 'mean_token_accuracy': '0.8655', 'epoch': '2'}
+{'loss': '0.4894', 'grad_norm': '1.156', 'learning_rate': '4.798e-06', 'entropy': '0.523', 'num_tokens': '9.755e+05', 'mean_token_accuracy': '0.8674', 'epoch': '2.08'}
+{'loss': '0.4654', 'grad_norm': '1.195', 'learning_rate': '4.065e-06', 'entropy': '0.5075', 'num_tokens': '1.014e+06', 'mean_token_accuracy': '0.872', 'epoch': '2.16'}
+{'loss': '0.4669', 'grad_norm': '1.055', 'learning_rate': '3.379e-06', 'entropy': '0.5047', 'num_tokens': '1.051e+06', 'mean_token_accuracy': '0.871', 'epoch': '2.24'}
+{'loss': '0.4841', 'grad_norm': '1.219', 'learning_rate': '2.744e-06', 'entropy': '0.5177', 'num_tokens': '1.087e+06', 'mean_token_accuracy': '0.8658', 'epoch': '2.32'}
+{'loss': '0.4896', 'grad_norm': '1.156', 'learning_rate': '2.166e-06', 'entropy': '0.5272', 'num_tokens': '1.124e+06', 'mean_token_accuracy': '0.8652', 'epoch': '2.4'}
+{'eval_loss': '0.8938', 'eval_runtime': '1.345', 'eval_samples_per_second': '74.34', 'eval_steps_per_second': '9.665', 'eval_entropy': '0.6236', 'eval_num_tokens': '1.124e+06', 'eval_mean_token_accuracy': '0.7953', 'epoch': '2.4'}
+{'loss': '0.478', 'grad_norm': '1.359', 'learning_rate': '1.649e-06', 'entropy': '0.5206', 'num_tokens': '1.161e+06', 'mean_token_accuracy': '0.8661', 'epoch': '2.48'}
+{'loss': '0.4865', 'grad_norm': '1.219', 'learning_rate': '1.196e-06', 'entropy': '0.5167', 'num_tokens': '1.199e+06', 'mean_token_accuracy': '0.8646', 'epoch': '2.56'}
+{'loss': '0.4633', 'grad_norm': '1.156', 'learning_rate': '8.127e-07', 'entropy': '0.5072', 'num_tokens': '1.236e+06', 'mean_token_accuracy': '0.8707', 'epoch': '2.64'}
+{'loss': '0.4805', 'grad_norm': '1.188', 'learning_rate': '5.004e-07', 'entropy': '0.5185', 'num_tokens': '1.272e+06', 'mean_token_accuracy': '0.8676', 'epoch': '2.72'}
+{'loss': '0.4622', 'grad_norm': '1.164', 'learning_rate': '2.621e-07', 'entropy': '0.5052', 'num_tokens': '1.31e+06', 'mean_token_accuracy': '0.8726', 'epoch': '2.8'}
+{'loss': '0.4845', 'grad_norm': '1.094', 'learning_rate': '9.951e-08', 'entropy': '0.5157', 'num_tokens': '1.349e+06', 'mean_token_accuracy': '0.8659', 'epoch': '2.88'}
+{'loss': '0.4881', 'grad_norm': '1.164', 'learning_rate': '1.401e-08', 'entropy': '0.5155', 'num_tokens': '1.387e+06', 'mean_token_accuracy': '0.8647', 'epoch': '2.96'}
+{'eval_loss': '0.894', 'eval_runtime': '1.335', 'eval_samples_per_second': '74.88', 'eval_steps_per_second': '9.734', 'eval_entropy': '0.6227', 'eval_num_tokens': '1.406e+06', 'eval_mean_token_accuracy': '0.7957', 'epoch': '3'}
+{'train_runtime': '512.1', 'train_samples_per_second': '11.72', 'train_steps_per_second': '0.732', 'train_loss': '0.5945', 'epoch': '3'}
+
+[train] Done — 8.5 min | Peak GPU: 6.5 GB
+[train] Checkpoint saved -> /scratch/ngangada/portfolio/sft-lora-rl/outputs/qlora_small
+
+[eval] Running GSM8K accuracy evaluation...

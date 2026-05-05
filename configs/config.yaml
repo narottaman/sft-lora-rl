@@ -1,0 +1,74 @@
+wandb:
+  project: "from-sft-to-grpo"
+  entity: "ngangada-arizona-state-university"
+
+models:
+  small:  "Qwen/Qwen2.5-0.5B-Instruct"
+  medium: "Qwen/Qwen2.5-3B-Instruct"
+
+dataset:
+  name: "openai/gsm8k"
+  subset: "main"
+  train_split: "train"
+  test_split:  "test"
+  max_train_samples: 2000
+  max_eval_samples:  100       # was 300 — 100 is enough for a stable accuracy number
+                               # saves ~7 min per run, 300 was overkill
+
+sft:
+  output_base_dir: "/scratch/ngangada/portfolio/sft-lora-rl/outputs"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size:  8
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-5
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05           # was 100 — must be 0.0 to 1.0, not a step count
+  bf16: true
+  fp16: false
+  logging_steps: 10
+  eval_steps: 100
+  save_steps: 200
+  save_total_limit: 2
+  max_seq_length: 512
+  packing: false
+
+lora:
+  r: 16
+  lora_alpha: 32
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+qlora:
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+grpo:
+  num_train_epochs: 2
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-5
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05           # was 50 — same fix as above
+  bf16: true
+  fp16: false
+  logging_steps: 5
+  save_steps: 100
+  save_total_limit: 2
+  max_seq_length: 512
+  max_new_tokens: 256
+  num_generations: 4
+  beta: 0.01
+  max_train_samples: 2000
+  max_eval_samples: 100        # was 300 — same fix

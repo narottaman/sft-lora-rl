@@ -1,0 +1,184 @@
+_wandb:
+    value:
+        cli_version: 0.26.1
+        e:
+            vj1yj4lgk8xy9fk5vuobxi0g1ealtxex:
+                args:
+                    - --model
+                    - small
+                    - --method
+                    - lora
+                    - --config
+                    - configs/config.yaml
+                codePath: scripts/train_sft.py
+                codePathLocal: scripts/train_sft.py
+                cpu_count: 48
+                cpu_count_logical: 48
+                cudaVersion: "13.0"
+                disk:
+                    /:
+                        total: "119830216704"
+                        used: "16679292928"
+                email: ngangada@asu.edu
+                executable: /home/ngangada/envs/sft_lora_rl/bin/python
+                git:
+                    commit: c38fa2fc172797de343b9266f428474da7e1d8e5
+                    remote: https://github.com/narottaman/sft-lora-rl.git
+                gpu: NVIDIA A100-SXM4-80GB
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 6912
+                      memoryTotal: "85899345920"
+                      name: NVIDIA A100-SXM4-80GB
+                      uuid: GPU-455a5c62-49ed-dd39-c517-ef8c67ff1824
+                host: sg009
+                memory:
+                    total: "540627013632"
+                os: Linux-4.18.0-553.77.1.el8_10.x86_64-x86_64-with-glibc2.28
+                program: /scratch/ngangada/portfolio/sft-lora-rl/scripts/train_sft.py
+                python: CPython 3.12.2
+                root: /scratch/ngangada/portfolio/sft-lora-rl
+                slurm:
+                    array_job_id: "52214060"
+                    array_task_count: "3"
+                    array_task_id: "1"
+                    array_task_max: "2"
+                    array_task_min: "0"
+                    array_task_step: "1"
+                    cluster_name: sol
+                    conf: /var/spool/slurmd/conf-cache/slurm.conf
+                    cpus_on_node: "8"
+                    cpus_per_task: "8"
+                    export_env: NONE
+                    get_user_env: "1"
+                    gpus_on_node: "1"
+                    gtids: "0"
+                    job_account: grp_cbaral
+                    job_cpus_per_node: "8"
+                    job_end_time: "1777971474"
+                    job_gid: "99999937"
+                    job_gpus: "2"
+                    job_id: "52214072"
+                    job_name: sft-phase1
+                    job_nodelist: sg009
+                    job_num_nodes: "1"
+                    job_partition: public
+                    job_qos: public
+                    job_start_time: "1777957074"
+                    job_uid: "3088253"
+                    job_user: ngangada
+                    jobid: "52214072"
+                    localid: "0"
+                    mem_per_node: "49152"
+                    nnodes: "1"
+                    nodeid: "0"
+                    nodelist: sg009
+                    oom_kill_step: "0"
+                    prio_process: "0"
+                    procid: "0"
+                    script_context: prolog_task
+                    submit_dir: /scratch/ngangada/portfolio/sft-lora-rl
+                    submit_host: sol-login01
+                    task_pid: "4036109"
+                    tasks_per_node: "1"
+                    topology_addr: sg009
+                    topology_addr_pattern: node
+                    tres_per_task: cpu=8
+                startedAt: "2026-05-05T04:58:51.878648Z"
+                writerId: vj1yj4lgk8xy9fk5vuobxi0g1ealtxex
+        m: []
+        python_version: 3.12.2
+        t:
+            "1":
+                - 1
+                - 11
+                - 49
+                - 51
+                - 71
+                - 84
+                - 98
+            "2":
+                - 1
+                - 11
+                - 49
+                - 51
+                - 71
+                - 84
+                - 98
+            "3":
+                - 13
+                - 15
+                - 16
+            "4": 3.12.2
+            "5": 0.26.1
+            "6": 5.7.0
+            "8":
+                - 2
+            "12": 0.26.1
+            "13": linux-x86_64
+bf16:
+    value: true
+bias:
+    value: none
+dataset:
+    value: openai/gsm8k
+eval_steps:
+    value: 100
+fp16:
+    value: false
+gradient_accumulation_steps:
+    value: 4
+learning_rate:
+    value: 2e-05
+logging_steps:
+    value: 10
+lora_alpha:
+    value: 32
+lora_dropout:
+    value: 0.05
+lr_scheduler_type:
+    value: cosine
+max_eval_samples:
+    value: 300
+max_seq_length:
+    value: 512
+max_train_samples:
+    value: 2000
+method:
+    value: lora
+model_name:
+    value: Qwen/Qwen2.5-0.5B-Instruct
+model_size:
+    value: small
+num_train_epochs:
+    value: 3
+output_base_dir:
+    value: /scratch/ngangada/portfolio/sft-lora-rl/outputs
+packing:
+    value: false
+per_device_eval_batch_size:
+    value: 8
+per_device_train_batch_size:
+    value: 4
+phase:
+    value: 1
+r:
+    value: 16
+save_steps:
+    value: 200
+save_total_limit:
+    value: 2
+target_modules:
+    value:
+        - q_proj
+        - k_proj
+        - v_proj
+        - o_proj
+        - gate_proj
+        - up_proj
+        - down_proj
+task_type:
+    value: CAUSAL_LM
+warmup_ratio:
+    value: 0.05
