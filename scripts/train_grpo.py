@@ -2,36 +2,29 @@
 scripts/train_grpo.py
 
 Phase 3 — GRPO reinforcement learning on GSM8K.
-Starts from a Phase 1/2 SFT checkpoint and applies policy gradient training
-using execution accuracy as the binary reward signal.
+Starts from any Phase 1/2 SFT checkpoint (full, lora, or qlora)
+and applies policy gradient training using execution accuracy as reward.
 
-GRPO (Group Relative Policy Optimization) — same algorithm as DeepSeek-R1:
-  - Sample G completions per prompt (num_generations)
-  - Reward each: 1.0 if #### answer correct, 0.0 otherwise
-  - Normalize rewards within the group: r_i = (r_i - mean) / std
-  - KL penalty (beta) prevents the policy from drifting too far from SFT init
+Weight update behavior per method:
+  full  — all weights trainable, highest task performance, risk of forgetting
+  lora  — only adapter matrices updated, base frozen, best generalization
+  qlora — same as lora but base is 4-bit quantized, most memory efficient
+
+GRPO algorithm (same as DeepSeek-R1):
+  1. Sample G completions per prompt (num_generations)
+  2. Reward each: 1.0 if #### answer correct, 0.0 otherwise
+  3. Normalize rewards within the group: advantage = (r - mean) / std
+  4. KL penalty (beta) keeps policy close to SFT initialization
+  5. Policy gradient update on adapter weights (lora/qlora) or all weights (full)
 
 Usage:
-    # Phase 3 Experiment A — best small model + GRPO
-    python scripts/train_grpo.py \
-        --sft-checkpoint /scratch/ngangada/portfolio/sft-lora-rl/outputs/lora_small \
-        --method lora \
-        --model small \
-        --run-name grpo_lora_small
-
-    # Phase 3 Experiment B — best large model + GRPO
-    python scripts/train_grpo.py \
-        --sft-checkpoint /scratch/ngangada/portfolio/sft-lora-rl/outputs/lora_medium \
-        --method lora \
-        --model medium \
-        --run-name grpo_lora_medium
-
-    # Phase 3 Experiment C — full SFT + GRPO (no adapters)
-    python scripts/train_grpo.py \
-        --sft-checkpoint /scratch/ngangada/portfolio/sft-lora-rl/outputs/full_small \
-        --method full \
-        --model small \
-        --run-name grpo_full_small
+    # Single experiment
+    python scripts/train_grpo.py --method lora   --model small  --run-name grpo_lora_small
+    python scripts/train_grpo.py --method qlora  --model small  --run-name grpo_qlora_small
+    python scripts/train_grpo.py --method full   --model small  --run-name grpo_full_small
+    python scripts/train_grpo.py --method lora   --model medium --run-name grpo_lora_medium
+    python scripts/train_grpo.py --method qlora  --model medium --run-name grpo_qlora_medium
+    python scripts/train_grpo.py --method full   --model medium --run-name grpo_full_medium
 
     # Smoke test
     python scripts/train_grpo.py --method lora --model small --smoke-test
@@ -49,10 +42,10 @@ import torch
 import wandb
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
+from peft import PeftModel, LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
 
 from src.data_utils import load_grpo_datasets, extract_answer, is_correct
-from src.model_utils import get_tokenizer, log_param_counts
+from src.model_utils import log_param_counts
 from src.evaluate import evaluate_gsm8k
 
 
@@ -69,80 +62,140 @@ def peak_gpu_gb() -> float:
 
 # ── Reward function ───────────────────────────────────────────────────────────
 
-def make_reward_fn(tokenizer):
+def make_reward_fn():
     """
-    Returns a reward function compatible with GRPOTrainer's signature:
-        reward_fn(prompts, completions, **kwargs) -> list[float]
-
-    GRPOTrainer passes:
-        prompts     : list[str]  — the input prompts (same as dataset 'prompt' field)
-        completions : list[str]  — model-generated completions
-        **kwargs    : extra dataset columns, including 'ground_truth'
+    Returns a GRPO-compatible reward function.
+    Signature: reward_fn(prompts, completions, **kwargs) -> list[float]
+    ground_truth is passed via dataset columns in **kwargs.
 
     Reward:
-        1.0  if the extracted #### number matches ground_truth exactly
-        0.0  otherwise
+        1.0 if extracted #### number matches ground_truth exactly
+        0.0 otherwise
     """
     def reward_fn(prompts, completions, ground_truth=None, **kwargs):
-        rewards = []
         gt_list = ground_truth if ground_truth is not None else [""] * len(completions)
-        for completion, gt in zip(completions, gt_list):
-            reward = 1.0 if is_correct(completion, gt) else 0.0
-            rewards.append(reward)
-        return rewards
-
+        return [
+            1.0 if is_correct(completion, gt) else 0.0
+            for completion, gt in zip(completions, gt_list)
+        ]
     return reward_fn
 
 
-# ── Model loading for Phase 3 ─────────────────────────────────────────────────
+# ── Checkpoint loading ────────────────────────────────────────────────────────
 
-def load_sft_checkpoint(sft_checkpoint: str, method: str, base_model_name: str, config: dict):
+def load_checkpoint_for_grpo(
+    sft_checkpoint: str,
+    method: str,
+    base_model_name: str,
+    config: dict,
+):
     """
     Load the SFT checkpoint as the starting policy for GRPO.
-    For LoRA: loads base + adapter (does NOT merge — we keep adapter for continued training).
-    For full: loads the saved model directly.
+
+    Full:  load checkpoint directly, keep all weights trainable.
+    LoRA:  load base model + adapter, keep adapter trainable, base frozen.
+    QLoRA: load base in bf16 (NOT 4-bit) + reload adapter weights.
+           We use bf16 for GRPO because:
+           - 4-bit NF4 cannot accumulate gradients for policy updates
+           - The LoRA adapter was trained in bf16 compute dtype anyway
+           - bf16 base + LoRA adapter = same trainable params as QLoRA SFT
+           - Memory is higher than QLoRA SFT but adapter still trains correctly
+
+    Returns (model, tokenizer) with only the correct parameters requiring grad.
     """
+    print(f"[grpo] Loading checkpoint: {sft_checkpoint}")
+    print(f"[grpo] Method: {method} | Base: {base_model_name}")
+
     if method == "full":
+        # All weights are trainable — same as SFT loading
         tokenizer = AutoTokenizer.from_pretrained(sft_checkpoint, trust_remote_code=True)
         model = AutoModelForCausalLM.from_pretrained(
             sft_checkpoint,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             device_map="auto",
             trust_remote_code=True,
         )
         model.enable_input_require_grads()
 
-    elif method in ("lora", "qlora"):
+    elif method == "lora":
+        # Base frozen, only adapter matrices get GRPO gradient updates
         tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
-
-        if method == "qlora":
-            # For GRPO we need bf16 (not 4-bit) to compute gradients properly
-            # QLoRA checkpoint: load base in bf16, reload adapter weights
-            print("[grpo] QLoRA checkpoint: loading in bf16 for GRPO training")
-            base = AutoModelForCausalLM.from_pretrained(
-                base_model_name,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-                trust_remote_code=True,
-            )
-        else:
-            base = AutoModelForCausalLM.from_pretrained(
-                base_model_name,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-                trust_remote_code=True,
-            )
-
+        base = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        # is_trainable=True keeps adapter weights requiring grad
         model = PeftModel.from_pretrained(base, sft_checkpoint, is_trainable=True)
         model.enable_input_require_grads()
+
+    elif method == "qlora":
+        # Load base in bf16 for gradient computation, reload adapter
+        # The base model weights stay frozen — only adapter is updated by GRPO
+        tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+        base = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            dtype=torch.bfloat16,   # bf16, not 4-bit — needed for gradients
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        # Load the adapter that was trained during QLoRA SFT
+        model = PeftModel.from_pretrained(base, sft_checkpoint, is_trainable=True)
+        model.enable_input_require_grads()
+        print("[grpo] QLoRA checkpoint: base loaded in bf16 for GRPO gradient computation")
 
     else:
         raise ValueError(f"Unknown method: {method}")
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"   # GRPOTrainer prefers left-padding for generation
+    tokenizer.padding_side = "left"  # GRPOTrainer prefers left-padding for generation
 
+    return model, tokenizer
+
+
+def load_base_model_for_grpo(method: str, base_model_name: str, config: dict):
+    """
+    Cold start — no SFT checkpoint available.
+    Builds model from scratch with same architecture as SFT.
+    Not recommended — SFT initialization makes GRPO much more stable.
+    """
+    print(f"[grpo] Cold start from base model: {base_model_name}")
+    lcfg = config["lora"]
+
+    if method == "full":
+        tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        model.enable_input_require_grads()
+
+    else:  # lora or qlora — attach fresh adapters
+        tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        lora_config = LoraConfig(
+            r=lcfg["r"],
+            lora_alpha=lcfg["lora_alpha"],
+            target_modules=lcfg["target_modules"],
+            lora_dropout=lcfg["lora_dropout"],
+            bias=lcfg["bias"],
+            task_type=TaskType.CAUSAL_LM,
+        )
+        model = get_peft_model(model, lora_config)
+        model.enable_input_require_grads()
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
     return model, tokenizer
 
 
@@ -150,17 +203,16 @@ def load_sft_checkpoint(sft_checkpoint: str, method: str, base_model_name: str, 
 
 def main():
     parser = argparse.ArgumentParser(description="GRPO RL training on GSM8K")
-    parser.add_argument("--sft-checkpoint", type=str, default=None,
-                        help="Path to Phase 1/2 SFT checkpoint. "
-                             "If omitted, starts from base model (cold start, not recommended).")
-    parser.add_argument("--model",  default="small",  choices=["small", "medium"])
-    parser.add_argument("--method", default="lora",   choices=["full", "lora", "qlora"])
-    parser.add_argument("--run-name",  type=str, default=None,
+    parser.add_argument("--method",   required=True, choices=["full", "lora", "qlora"])
+    parser.add_argument("--model",    required=True, choices=["small", "medium"])
+    parser.add_argument("--run-name", type=str, default=None,
                         help="W&B run name. Defaults to grpo_{method}_{model}.")
-    parser.add_argument("--config", default="configs/config.yaml")
+    parser.add_argument("--sft-checkpoint", type=str, default=None,
+                        help="Path to SFT checkpoint. Defaults to outputs/{method}_{model}.")
+    parser.add_argument("--config",     default="configs/config.yaml")
     parser.add_argument("--no-eval",    action="store_true")
     parser.add_argument("--smoke-test", action="store_true",
-                        help="50 samples, 1 epoch — test the reward fn and trainer loop")
+                        help="50 samples, 1 epoch — fast pipeline test")
     args = parser.parse_args()
 
     config     = load_config(args.config)
@@ -170,16 +222,16 @@ def main():
     output_dir = os.path.join(config["sft"]["output_base_dir"], run_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Determine SFT checkpoint
-    sft_ckpt = args.sft_checkpoint
-    if sft_ckpt is None:
-        sft_ckpt = os.path.join(config["sft"]["output_base_dir"], f"{args.method}_{args.model}")
-        print(f"[grpo] --sft-checkpoint not set, using default: {sft_ckpt}")
+    # Resolve SFT checkpoint path
+    sft_ckpt = args.sft_checkpoint or os.path.join(
+        config["sft"]["output_base_dir"],
+        f"{args.method}_{args.model}"
+    )
 
     # Smoke test overrides
-    max_train = 50   if args.smoke_test else gcfg["max_train_samples"]
-    max_eval  = 30   if args.smoke_test else gcfg["max_eval_samples"]
-    epochs    = 1    if args.smoke_test else gcfg["num_train_epochs"]
+    max_train = 50  if args.smoke_test else gcfg["max_train_samples"]
+    max_eval  = 30  if args.smoke_test else gcfg["max_eval_samples"]
+    epochs    = 1   if args.smoke_test else gcfg["num_train_epochs"]
 
     # ── W&B ───────────────────────────────────────────────────────────────────
     wandb.init(
@@ -189,39 +241,38 @@ def main():
         job_type="grpo",
         tags=[args.method, args.model, "phase3", "rl", "grpo"],
         config={
-            "model_name":      model_name,
-            "method":          args.method,
-            "model_size":      args.model,
-            "phase":           3,
-            "sft_checkpoint":  sft_ckpt,
-            "dataset":         "openai/gsm8k",
+            "model_name":       model_name,
+            "method":           args.method,
+            "model_size":       args.model,
+            "phase":            3,
+            "sft_checkpoint":   sft_ckpt,
+            "dataset":          "openai/gsm8k",
             "max_train_samples": max_train,
             "max_eval_samples":  max_eval,
             **gcfg,
         },
     )
 
-    # ── Data ──────────────────────────────────────────────────────────────────
+    # ── Model — load FIRST so tokenizer is available for data formatting ──────
+    if os.path.isdir(sft_ckpt):
+        model, tokenizer = load_checkpoint_for_grpo(
+            sft_ckpt, args.method, model_name, config
+        )
+    else:
+        print(f"[grpo] WARNING: checkpoint not found at {sft_ckpt}, using cold start")
+        model, tokenizer = load_base_model_for_grpo(args.method, model_name, config)
+
+    log_param_counts(model, run_name)
+
+    # ── Data — pass tokenizer so apply_chat_template uses correct format ──────
     train_ds, eval_ds = load_grpo_datasets(
+        tokenizer=tokenizer,
         max_train_samples=max_train,
         max_eval_samples=max_eval,
     )
 
-    # ── Model ─────────────────────────────────────────────────────────────────
-    if os.path.isdir(sft_ckpt):
-        print(f"[grpo] Loading SFT checkpoint: {sft_ckpt}")
-        model, tokenizer = load_sft_checkpoint(sft_ckpt, args.method, model_name, config)
-    else:
-        print(f"[grpo] WARNING: SFT checkpoint not found at {sft_ckpt}")
-        print(f"[grpo] Starting from base model {model_name} (cold start)")
-        from src.model_utils import load_lora, load_full, load_qlora
-        loaders = {"full": load_full, "lora": load_lora, "qlora": load_qlora}
-        model, tokenizer = loaders[args.method](model_name, config)
-
-    log_param_counts(model, run_name)
-
-    # ── Reward fn ─────────────────────────────────────────────────────────────
-    reward_fn = make_reward_fn(tokenizer)
+    # ── Reward function ───────────────────────────────────────────────────────
+    reward_fn = make_reward_fn()
 
     # ── GRPO config ───────────────────────────────────────────────────────────
     grpo_config = GRPOConfig(
@@ -239,17 +290,16 @@ def main():
         save_total_limit=gcfg["save_total_limit"],
         report_to="wandb",
         run_name=run_name,
-        # GRPO-specific
-        max_new_tokens=gcfg["max_new_tokens"],
-        num_generations=gcfg["num_generations"],    # G — samples per prompt
-        beta=gcfg["beta"],                          # KL penalty coefficient
-        max_prompt_length=gcfg["max_seq_length"],
+        max_completion_length=gcfg["max_completion_length"],
+        num_generations=gcfg["num_generations"],
+        beta=gcfg["beta"],
+        #max_prompt_length=gcfg["max_seq_length"],
     )
 
     # ── Trainer ───────────────────────────────────────────────────────────────
     trainer = GRPOTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         args=grpo_config,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
@@ -257,12 +307,13 @@ def main():
     )
 
     print(f"\n{'='*60}")
-    print(f"  Starting GRPO: {run_name}")
-    print(f"  Model:         {model_name}")
-    print(f"  SFT init:      {sft_ckpt}")
-    print(f"  Train samples: {len(train_ds):,} × {epochs} epochs")
-    print(f"  Generations G: {gcfg['num_generations']} per prompt")
-    print(f"  KL beta:       {gcfg['beta']}")
+    print(f"  GRPO Run:   {run_name}")
+    print(f"  Model:      {model_name}")
+    print(f"  Method:     {args.method}")
+    print(f"  SFT init:   {sft_ckpt}")
+    print(f"  Train:      {len(train_ds):,} samples x {epochs} epochs")
+    print(f"  G (gens):   {gcfg['num_generations']} per prompt")
+    print(f"  KL beta:    {gcfg['beta']}")
     print(f"{'='*60}\n")
 
     t0 = time.time()
@@ -280,7 +331,7 @@ def main():
     # ── Save ──────────────────────────────────────────────────────────────────
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
-    print(f"[grpo] Checkpoint saved → {output_dir}")
+    print(f"[grpo] Checkpoint saved -> {output_dir}")
 
     # ── Evaluate ──────────────────────────────────────────────────────────────
     if not args.no_eval:
@@ -293,7 +344,7 @@ def main():
         )
 
     wandb.finish()
-    print(f"\n✅  {run_name} complete.\n")
+    print(f"\n[done] {run_name} complete.\n")
 
 
 if __name__ == "__main__":

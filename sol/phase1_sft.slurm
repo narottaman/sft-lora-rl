@@ -3,7 +3,7 @@
 #SBATCH --job-name=sft-phase1
 #SBATCH --output=/scratch/ngangada/portfolio/sft-lora-rl/logs/phase1_%j_%a.out
 #SBATCH --error=/scratch/ngangada/portfolio/sft-lora-rl/logs/phase1_%j_%a.err
-#SBATCH -t 0-02:00:00
+#SBATCH -t 0-01:00:00
 #SBATCH -p public
 #SBATCH -q public
 #SBATCH -N 1

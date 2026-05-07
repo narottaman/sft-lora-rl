@@ -3,25 +3,21 @@ scripts/train_sft.py
 
 Phase 1 + Phase 2 training — SFT, LoRA, QLoRA on Qwen2.5-0.5B and 3B.
 
-Every run is a single (model_size, method) combination.
-W&B tracks: loss curves, trainable %, GPU memory, GSM8K accuracy.
+KEY FIX: load_sft_datasets() now receives the tokenizer so it can use
+apply_chat_template correctly for any model size. Previously the hardcoded
+<|im_start|> format caused loss=10.86 on 3B models.
 
 Usage:
-    python scripts/train_sft.py --model small --method full     # Phase 1
-    python scripts/train_sft.py --model small --method lora     # Phase 1
-    python scripts/train_sft.py --model small --method qlora    # Phase 1
-    python scripts/train_sft.py --model medium --method lora    # Phase 2
-    python scripts/train_sft.py --model medium --method qlora   # Phase 2
-    python scripts/train_sft.py --model medium --method full    # optional 3B full
+    python scripts/train_sft.py --model small --method full
+    python scripts/train_sft.py --model small --method lora
+    python scripts/train_sft.py --model small --method qlora
+    python scripts/train_sft.py --model medium --method lora
+    python scripts/train_sft.py --model medium --method qlora
+    python scripts/train_sft.py --model medium --method full
 
 Flags:
-    --no-eval     skip post-training GSM8K evaluation (faster for debugging)
-    --smoke-test  100 samples, 1 epoch — verify pipeline works before Sol
-
-NOTE on TRL versions:
-    TRL >= 0.13 moved max_seq_length / dataset_text_field / packing
-    out of SFTConfig and into SFTTrainer directly.
-    This file is written for TRL >= 0.13.
+    --no-eval     skip post-training evaluation
+    --smoke-test  100 samples, 1 epoch
 """
 
 import os
@@ -41,8 +37,6 @@ from src.model_utils import get_model_and_tokenizer
 from src.evaluate import evaluate_gsm8k
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
 def load_config(path: str = "configs/config.yaml") -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
@@ -52,15 +46,13 @@ def peak_gpu_gb() -> float:
     return torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-
 def main():
-    parser = argparse.ArgumentParser(description="SFT / LoRA / QLoRA training on GSM8K")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--model",  default="small",  choices=["small", "medium"])
     parser.add_argument("--method", default="lora",   choices=["full", "lora", "qlora"])
     parser.add_argument("--config", default="configs/config.yaml")
-    parser.add_argument("--no-eval",    action="store_true", help="Skip accuracy eval")
-    parser.add_argument("--smoke-test", action="store_true", help="Tiny run to test pipeline")
+    parser.add_argument("--no-eval",    action="store_true")
+    parser.add_argument("--smoke-test", action="store_true")
     args = parser.parse_args()
 
     config     = load_config(args.config)
@@ -70,7 +62,6 @@ def main():
     output_dir = os.path.join(tcfg["output_base_dir"], run_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # smoke-test overrides
     max_train = 100 if args.smoke_test else config["dataset"]["max_train_samples"]
     max_eval  = 50  if args.smoke_test else config["dataset"]["max_eval_samples"]
     epochs    = 1   if args.smoke_test else tcfg["num_train_epochs"]
@@ -96,13 +87,7 @@ def main():
         },
     )
 
-    # ── Data ──────────────────────────────────────────────────────────────────
-    train_ds, eval_ds = load_sft_datasets(
-        max_train_samples=max_train,
-        max_eval_samples=max_eval,
-    )
-
-    # ── Model ─────────────────────────────────────────────────────────────────
+    # ── Model — load FIRST so tokenizer is available for dataset formatting ───
     model, tokenizer = get_model_and_tokenizer(
         model_name=model_name,
         method=args.method,
@@ -110,10 +95,14 @@ def main():
         run_name=run_name,
     )
 
+    # ── Data — pass tokenizer so apply_chat_template uses correct format ──────
+    train_ds, eval_ds = load_sft_datasets(
+        tokenizer=tokenizer,
+        max_train_samples=max_train,
+        max_eval_samples=max_eval,
+    )
+
     # ── Training args ─────────────────────────────────────────────────────────
-    # NOTE: max_seq_length / dataset_text_field / packing belong on SFTTrainer
-    # in TRL >= 0.13, NOT on SFTConfig. Putting them on SFTConfig raises:
-    # TypeError: SFTConfig.__init__() got an unexpected keyword argument
     training_args = SFTConfig(
         output_dir=output_dir,
         num_train_epochs=epochs,
@@ -139,7 +128,8 @@ def main():
         dataset_text_field="text",
         packing=tcfg["packing"],
     )
-    
+
+    # ── Trainer ───────────────────────────────────────────────────────────────
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
@@ -147,6 +137,7 @@ def main():
         eval_dataset=eval_ds,
         args=training_args,
     )
+
     print(f"\n{'='*60}")
     print(f"  Starting: {run_name}")
     print(f"  Model:    {model_name}")
@@ -166,12 +157,10 @@ def main():
     })
     print(f"\n[train] Done — {elapsed/60:.1f} min | Peak GPU: {mem_gb:.1f} GB")
 
-    # ── Save checkpoint ───────────────────────────────────────────────────────
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
     print(f"[train] Checkpoint saved -> {output_dir}")
 
-    # ── Evaluate ──────────────────────────────────────────────────────────────
     if not args.no_eval:
         print("\n[eval] Running GSM8K accuracy evaluation...")
         evaluate_gsm8k(
