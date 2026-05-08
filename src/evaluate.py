@@ -54,7 +54,7 @@ def load_for_inference(checkpoint: str, method: str, base_model_name: str):
     return model, tokenizer
 
 
-def generate_answer(model, tokenizer, question: str, max_new_tokens: int = 256) -> str:
+def generate_answer(model, tokenizer, question: str, max_new_tokens: int = 512) -> str:
     """
     Greedy generation for a single question.
 
@@ -100,7 +100,7 @@ def evaluate_gsm8k(
     rows = []
 
     for i, item in enumerate(tqdm(test_data, desc=f"Eval [{run_name}]")):
-        raw_output = generate_answer(model, tokenizer, item["question"], max_new_tokens)
+        raw_output = generate_answer(model, tokenizer, item["question"], max_new_tokens=512)
         predicted   = extract_answer(raw_output)
         correct_flag = is_correct(raw_output, item["answer"])
         if correct_flag:
